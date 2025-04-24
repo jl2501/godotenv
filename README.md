@@ -1,6 +1,9 @@
-# GoDotEnv ![CI](https://github.com/joho/godotenv/workflows/CI/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/joho/godotenv)](https://goreportcard.com/report/github.com/joho/godotenv)
+# GoDotEnv ![CI](https://github.com/jl2501/godotenv/workflows/CI/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/jl2501/godotenv)](https://goreportcard.com/report/github.com/jl2501/godotenv)
 
-Exactly the same as the upstream godotenv, only allows passing in an in-memory filesystem via afero lib
+> [!NOTE]
+> This is a fork of [https://github.com/joho/godotenv](https://github.com/joho/godotenv)
+>
+> Exactly the same as the joho godotenv, only allows passing in an in-memory filesystem via afero lib
 for easier unit tests.
 
 A Go (golang) port of the Ruby [dotenv](https://github.com/bkeepers/dotenv) project (which loads env vars from a .env file).
@@ -20,19 +23,13 @@ There is test coverage and CI for both linuxish and Windows environments, but I 
 As a library
 
 ```shell
-go get github.com/joho/godotenv
+go get github.com/jl2501/godotenv
 ```
 
 or if you want to use it as a bin command
 
-go >= 1.17
 ```shell
-go install github.com/joho/godotenv/cmd/godotenv@latest
-```
-
-go < 1.17
-```shell
-go get github.com/joho/godotenv/cmd/godotenv
+go install github.com/jl2501/godotenv/cmd/godotenv@latest
 ```
 
 ## Usage
@@ -53,11 +50,12 @@ import (
     "log"
     "os"
 
-    "github.com/joho/godotenv"
+    "github.com/jl2501/godotenv"
+    "github.com/spf13/afero"
 )
 
 func main() {
-  err := godotenv.Load()
+  err := godotenv.Load(afero.NewMemMapFs())
   if err != nil {
     log.Fatal("Error loading .env file")
   }
@@ -72,14 +70,14 @@ func main() {
 If you're even lazier than that, you can just take advantage of the autoload package which will read in `.env` on import
 
 ```go
-import _ "github.com/joho/godotenv/autoload"
+import _ "github.com/jl2501/godotenv/autoload"
 ```
 
 While `.env` in the project root is the default, you don't have to be constrained, both examples below are 100% legit
 
 ```go
-godotenv.Load("somerandomfile")
-godotenv.Load("filenumberone.env", "filenumbertwo.env")
+godotenv.Load(afs, "somerandomfile")
+godotenv.Load(afs, "filenumberone.env", "filenumbertwo.env")
 ```
 
 If you want to be really fancy with your env file you can do comments and exports (below is a valid env file)
@@ -102,7 +100,7 @@ as a final aside, if you don't want godotenv munging your env you can just get a
 
 ```go
 var myEnv map[string]string
-myEnv, err := godotenv.Read()
+myEnv, err := godotenv.Read(afs)
 
 s3Bucket := myEnv["S3_BUCKET"]
 ```
@@ -111,14 +109,14 @@ s3Bucket := myEnv["S3_BUCKET"]
 
 ```go
 reader := getRemoteFile()
-myEnv, err := godotenv.Parse(reader)
+myEnv, err := godotenv.Parse(afs, reader)
 ```
 
 ... or from a `string` if you so desire
 
 ```go
 content := getRemoteFileContent()
-myEnv, err := godotenv.Unmarshal(content)
+myEnv, err := godotenv.Unmarshal(afs, content)
 ```
 
 ### Precedence & Conventions
@@ -135,12 +133,12 @@ if "" == env {
   env = "development"
 }
 
-godotenv.Load(".env." + env + ".local")
+godotenv.Load(afs, ".env." + env + ".local")
 if "test" != env {
-  godotenv.Load(".env.local")
+  godotenv.Load(afs, ".env.local")
 }
-godotenv.Load(".env." + env)
-godotenv.Load() // The Original .env
+godotenv.Load(afs, ".env." + env)
+godotenv.Load(afs) // The Original .env
 ```
 
 If you need to, you can also use `godotenv.Overload()` to defy this convention
@@ -163,43 +161,21 @@ By default, it won't override existing environment variables; you can do that wi
 Godotenv can also write a map representing the environment to a correctly-formatted and escaped file
 
 ```go
-env, err := godotenv.Unmarshal("KEY=value")
-err := godotenv.Write(env, "./.env")
+env, err := godotenv.Unmarshal(afs, "KEY=value")
+err := godotenv.Write(afs, env, "./.env")
 ```
 
 ... or to a string
 
 ```go
-env, err := godotenv.Unmarshal("KEY=value")
-content, err := godotenv.Marshal(env)
+env, err := godotenv.Unmarshal(afs, "KEY=value")
+content, err := godotenv.Marshal(afs, env)
 ```
-
-## Contributing
-
-Contributions are welcome, but with some caveats.
-
-This library has been declared feature complete (see [#182](https://github.com/joho/godotenv/issues/182) for background) and will not be accepting issues or pull requests adding new functionality or breaking the library API.
-
-Contributions would be gladly accepted that:
-
-* bring this library's parsing into closer compatibility with the mainline dotenv implementations, in particular [Ruby's dotenv](https://github.com/bkeepers/dotenv) and [Node.js' dotenv](https://github.com/motdotla/dotenv)
-* keep the library up to date with the go ecosystem (ie CI bumps, documentation changes, changes in the core libraries)
-* bug fixes for use cases that pertain to the library's purpose of easing development of codebases deployed into twelve factor environments
-
-*code changes without tests and references to peer dotenv implementations will not be accepted*
-
-1. Fork it
-2. Create your feature branch (`git checkout -b my-new-feature`)
-3. Commit your changes (`git commit -am 'Added some feature'`)
-4. Push to the branch (`git push origin my-new-feature`)
-5. Create new Pull Request
 
 ## Releases
 
 Releases should follow [Semver](http://semver.org/) though the first couple of releases are `v1` and `v1.1`.
 
-Use [annotated tags for all releases](https://github.com/joho/godotenv/issues/30). Example `git tag -a v1.2.1`
-
 ## Who?
 
-The original library [dotenv](https://github.com/bkeepers/dotenv) was written by [Brandon Keepers](http://opensoul.org/), and this port was done by [John Barton](https://johnbarton.co/) based off the tests/fixtures in the original library.
+The original library [dotenv](https://github.com/bkeepers/dotenv) was written by [Brandon Keepers](http://opensoul.org/), and this port was done by [John Barton](https://johnbarton.co/) based off the tests/fixtures in the original library, then supports of in-memory filesystem via afero lib was brought by [James Light](https://github.com/jl2501)

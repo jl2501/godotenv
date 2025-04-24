@@ -1,6 +1,6 @@
 // Package godotenv is a go port of the ruby dotenv library (https://github.com/bkeepers/dotenv)
 //
-// Examples/readme can be found on the GitHub page at https://github.com/joho/godotenv
+// Examples/readme can be found on the GitHub page at https://github.com/jl2501/godotenv
 //
 // The TL;DR is that you make a .env file that looks something like
 //
@@ -47,7 +47,7 @@ func Parse(r io.Reader) (map[string]string, error) {
 //
 // You can otherwise tell it which files to load (there can be more than one) like:
 //
-//	godotenv.Load("fileone", "filetwo")
+//	godotenv.Load(afs, "fileone", "filetwo")
 //
 // It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults.
 func Load(fs afero.Fs, filenames ...string) (err error) {
@@ -70,7 +70,7 @@ func Load(fs afero.Fs, filenames ...string) (err error) {
 //
 // You can otherwise tell it which files to load (there can be more than one) like:
 //
-//	godotenv.Overload("fileone", "filetwo")
+//	godotenv.Overload(afs, "fileone", "filetwo")
 //
 // It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefully set all vars.
 func Overload(fs afero.Fs, filenames ...string) (err error) {
