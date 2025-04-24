@@ -1,4 +1,4 @@
-# GoDotEnv ![CI](https://github.com/jl2501/godotenv/workflows/CI/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/jl2501/godotenv)](https://goreportcard.com/report/github.com/jl2501/godotenv)
+# GoDotEnv ![CI](https://github.com/jl2501/godotenv/workflows/CI/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/jl2501/godotenv)](https://goreportcard.com/report/github.com/jl2501/godotenv) [![Go Reference](https://pkg.go.dev/badge/github.com/jl2501/godotenv.svg)](https://pkg.go.dev/github.com/jl2501/godotenv)
 
 > [!NOTE]
 > This is a fork of [https://github.com/joho/godotenv](https://github.com/joho/godotenv)
