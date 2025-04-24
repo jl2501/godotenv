@@ -1,4 +1,4 @@
-module github.com/joho/godotenv
+module github.com/jl2501/godotenv
 
 go 1.23.0
 
