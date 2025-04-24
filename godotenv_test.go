@@ -3,10 +3,13 @@ package godotenv
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 )
 
 var noopPresets = make(map[string]string)
@@ -23,7 +26,7 @@ func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expect
 	}
 }
 
-func loadEnvAndCompareValues(t *testing.T, loader func(files ...string) error, envFileName string, expectedValues map[string]string, presets map[string]string) {
+func loadEnvAndCompareValues(t *testing.T, fs afero.Fs, loader func(fs afero.Fs, files ...string) error, envFileName string, expectedValues map[string]string, presets map[string]string) {
 	// first up, clear the env
 	os.Clearenv()
 
@@ -31,7 +34,7 @@ func loadEnvAndCompareValues(t *testing.T, loader func(files ...string) error, e
 		os.Setenv(k, v)
 	}
 
-	err := loader(envFileName)
+	err := loader(fs, envFileName)
 	if err != nil {
 		t.Fatalf("Error loading %v", envFileName)
 	}
@@ -45,8 +48,44 @@ func loadEnvAndCompareValues(t *testing.T, loader func(files ...string) error, e
 	}
 }
 
+func copyFixtureFiles(vfs afero.Fs) error {
+	fixturesDirname := "fixtures"
+	osFs := afero.NewOsFs()
+	err := afero.Walk(osFs, fixturesDirname, func(path string, info fs.FileInfo, err error) error {
+		var data []byte
+
+		if err != nil {
+			return fmt.Errorf("Error from Walk: %v", err)
+		}
+
+		if info.IsDir() {
+			err = vfs.MkdirAll(path, 0o755)
+			if err != nil {
+				return fmt.Errorf("Error creating dir in virtual fs: $%s: %v", path, err)
+			}
+		} else {
+			data, err = os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("Error reading file from real fs: %s: %w", path, err)
+			}
+
+			err = afero.WriteFile(vfs, path, data, 0o666)
+			if err != nil {
+				return fmt.Errorf("Error writing file to virtual fs: %s: %w", path, err)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func TestLoadWithNoArgsLoadsDotEnv(t *testing.T) {
-	err := Load()
+	fs := afero.NewMemMapFs()
+	err := Load(fs)
 	pathError := err.(*os.PathError)
 	if pathError == nil || pathError.Op != "open" || pathError.Path != ".env" {
 		t.Errorf("Didn't try and open .env by default")
@@ -54,7 +93,8 @@ func TestLoadWithNoArgsLoadsDotEnv(t *testing.T) {
 }
 
 func TestOverloadWithNoArgsOverloadsDotEnv(t *testing.T) {
-	err := Overload()
+	fs := afero.NewMemMapFs()
+	err := Overload(fs)
 	pathError := err.(*os.PathError)
 	if pathError == nil || pathError.Op != "open" || pathError.Path != ".env" {
 		t.Errorf("Didn't try and open .env by default")
@@ -62,14 +102,16 @@ func TestOverloadWithNoArgsOverloadsDotEnv(t *testing.T) {
 }
 
 func TestLoadFileNotFound(t *testing.T) {
-	err := Load("somefilethatwillneverexistever.env")
+	fs := afero.NewMemMapFs()
+	err := Load(fs, "somefilethatwillneverexistever.env")
 	if err == nil {
 		t.Error("File wasn't found but Load didn't return an error")
 	}
 }
 
 func TestOverloadFileNotFound(t *testing.T) {
-	err := Overload("somefilethatwillneverexistever.env")
+	fs := afero.NewMemMapFs()
+	err := Overload(fs, "somefilethatwillneverexistever.env")
 	if err == nil {
 		t.Error("File wasn't found but Overload didn't return an error")
 	}
@@ -88,7 +130,12 @@ func TestReadPlainEnv(t *testing.T) {
 		"OPTION_H": "1 2",
 	}
 
-	envMap, err := Read(envFileName)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	envMap, err := Read(fs, envFileName)
 	if err != nil {
 		t.Error("Error reading file")
 	}
@@ -134,7 +181,12 @@ func TestLoadDoesNotOverride(t *testing.T) {
 		"OPTION_A": "do_not_override",
 		"OPTION_B": "",
 	}
-	loadEnvAndCompareValues(t, Load, envFileName, expectedValues, presets)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, presets)
 }
 
 func TestOverloadDoesOverride(t *testing.T) {
@@ -148,7 +200,12 @@ func TestOverloadDoesOverride(t *testing.T) {
 	expectedValues := map[string]string{
 		"OPTION_A": "1",
 	}
-	loadEnvAndCompareValues(t, Overload, envFileName, expectedValues, presets)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	loadEnvAndCompareValues(t, fs, Overload, envFileName, expectedValues, presets)
 }
 
 func TestLoadPlainEnv(t *testing.T) {
@@ -162,7 +219,12 @@ func TestLoadPlainEnv(t *testing.T) {
 		"OPTION_H": "1 2",
 	}
 
-	loadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
 }
 
 func TestLoadExportedEnv(t *testing.T) {
@@ -172,7 +234,12 @@ func TestLoadExportedEnv(t *testing.T) {
 		"OPTION_B": "\\n",
 	}
 
-	loadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
 }
 
 func TestLoadEqualsEnv(t *testing.T) {
@@ -181,7 +248,13 @@ func TestLoadEqualsEnv(t *testing.T) {
 		"OPTION_A": "postgres://localhost:5432/database?sslmode=disable",
 	}
 
-	loadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+
+	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
 }
 
 func TestLoadQuotedEnv(t *testing.T) {
@@ -202,7 +275,12 @@ func TestLoadQuotedEnv(t *testing.T) {
 		"OPTION_M": "line one\nthis is \"quoted\"\none more line",
 	}
 
-	loadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
 }
 
 func TestSubstitutions(t *testing.T) {
@@ -221,7 +299,12 @@ func TestSubstitutions(t *testing.T) {
 		"OPTION_F": "global",
 	}
 
-	loadEnvAndCompareValues(t, Load, envFileName, expectedValues, presets)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, presets)
 }
 
 func TestExpanding(t *testing.T) {
@@ -318,7 +401,12 @@ func TestVariableStringValueSeparator(t *testing.T) {
 func TestActualEnvVarsAreLeftAlone(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("OPTION_A", "actualenv")
-	_ = Load("fixtures/plain.env")
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	_ = Load(fs, "fixtures/plain.env")
 
 	if os.Getenv("OPTION_A") != "actualenv" {
 		t.Error("An ENV var set earlier was overwritten")
@@ -459,7 +547,12 @@ func TestLinesToIgnore(t *testing.T) {
 
 func TestErrorReadDirectory(t *testing.T) {
 	envFileName := "fixtures/"
-	envMap, err := Read(envFileName)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	envMap, err := Read(fs, envFileName)
 
 	if err == nil {
 		t.Errorf("Expected error, got %v", envMap)
@@ -468,7 +561,12 @@ func TestErrorReadDirectory(t *testing.T) {
 
 func TestErrorParsing(t *testing.T) {
 	envFileName := "fixtures/invalid1.env"
-	envMap, err := Read(envFileName)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	envMap, err := Read(fs, envFileName)
 	if err == nil {
 		t.Errorf("Expected error, got %v", envMap)
 	}
@@ -485,7 +583,12 @@ func TestComments(t *testing.T) {
 		"baz":  "foo",
 	}
 
-	loadEnvAndCompareValues(t, Load, envFileName, expectedValues, noopPresets)
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
 }
 
 func TestWrite(t *testing.T) {
@@ -516,9 +619,15 @@ func TestWrite(t *testing.T) {
 
 func TestRoundtrip(t *testing.T) {
 	fixtures := []string{"equals.env", "exported.env", "plain.env", "quoted.env"}
+	fs := afero.NewMemMapFs()
+	err := copyFixtureFiles(fs)
+	if err != nil {
+		t.Fatalf("Error copying fixture files to afero fs: %v", err)
+	}
+
 	for _, fixture := range fixtures {
 		fixtureFilename := fmt.Sprintf("fixtures/%s", fixture)
-		env, err := readFile(fixtureFilename)
+		env, err := readFile(fs, fixtureFilename)
 		if err != nil {
 			t.Errorf("Expected '%s' to read without error (%v)", fixtureFilename, err)
 		}
