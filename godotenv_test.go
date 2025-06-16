@@ -16,7 +16,6 @@ var noopPresets = make(map[string]string)
 
 func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expectedValue string) {
 	result, err := Unmarshal(rawEnvLine)
-
 	if err != nil {
 		t.Errorf("Expected %q to parse as %q: %q, errored %q", rawEnvLine, expectedKey, expectedValue, err)
 		return
@@ -26,7 +25,9 @@ func parseAndCompare(t *testing.T, rawEnvLine string, expectedKey string, expect
 	}
 }
 
-func loadEnvAndCompareValues(t *testing.T, fs afero.Fs, loader func(fs afero.Fs, files ...string) error, envFileName string, expectedValues map[string]string, presets map[string]string) {
+func loadEnvAndCompareValues(t *testing.T, fs afero.Fs, loader func(files ...string) error, envFileName string, expectedValues map[string]string, presets map[string]string) {
+	t.Helper()
+
 	// first up, clear the env
 	os.Clearenv()
 
@@ -34,7 +35,7 @@ func loadEnvAndCompareValues(t *testing.T, fs afero.Fs, loader func(fs afero.Fs,
 		os.Setenv(k, v)
 	}
 
-	err := loader(fs, envFileName)
+	err := loader(envFileName)
 	if err != nil {
 		t.Fatalf("Error loading %v", envFileName)
 	}
@@ -84,8 +85,9 @@ func copyFixtureFiles(vfs afero.Fs) error {
 }
 
 func TestLoadWithNoArgsLoadsDotEnv(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	err := Load(fs)
+	dotenv := NewGoDotEnv(afero.NewMemMapFs())
+
+	err := dotenv.Load()
 	pathError := err.(*os.PathError)
 	if pathError == nil || pathError.Op != "open" || pathError.Path != ".env" {
 		t.Errorf("Didn't try and open .env by default")
@@ -93,8 +95,8 @@ func TestLoadWithNoArgsLoadsDotEnv(t *testing.T) {
 }
 
 func TestOverloadWithNoArgsOverloadsDotEnv(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	err := Overload(fs)
+	dotenv := NewGoDotEnv(afero.NewMemMapFs())
+	err := dotenv.Overload()
 	pathError := err.(*os.PathError)
 	if pathError == nil || pathError.Op != "open" || pathError.Path != ".env" {
 		t.Errorf("Didn't try and open .env by default")
@@ -102,16 +104,16 @@ func TestOverloadWithNoArgsOverloadsDotEnv(t *testing.T) {
 }
 
 func TestLoadFileNotFound(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	err := Load(fs, "somefilethatwillneverexistever.env")
+	dotenv := NewGoDotEnv(afero.NewMemMapFs())
+	err := dotenv.Load("somefilethatwillneverexistever.env")
 	if err == nil {
 		t.Error("File wasn't found but Load didn't return an error")
 	}
 }
 
 func TestOverloadFileNotFound(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	err := Overload(fs, "somefilethatwillneverexistever.env")
+	dotenv := NewGoDotEnv(afero.NewMemMapFs())
+	err := dotenv.Overload("somefilethatwillneverexistever.env")
 	if err == nil {
 		t.Error("File wasn't found but Overload didn't return an error")
 	}
@@ -135,7 +137,9 @@ func TestReadPlainEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	envMap, err := Read(fs, envFileName)
+	dotenv := NewGoDotEnv(fs)
+
+	envMap, err := dotenv.Read(envFileName)
 	if err != nil {
 		t.Error("Error reading file")
 	}
@@ -186,7 +190,9 @@ func TestLoadDoesNotOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, presets)
+
+	dotenv := NewGoDotEnv(fs)
+	loadEnvAndCompareValues(t, fs, dotenv.Load, envFileName, expectedValues, presets)
 }
 
 func TestOverloadDoesOverride(t *testing.T) {
@@ -205,7 +211,9 @@ func TestOverloadDoesOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	loadEnvAndCompareValues(t, fs, Overload, envFileName, expectedValues, presets)
+
+	dotenv := NewGoDotEnv(fs)
+	loadEnvAndCompareValues(t, fs, dotenv.Overload, envFileName, expectedValues, presets)
 }
 
 func TestLoadPlainEnv(t *testing.T) {
@@ -224,7 +232,9 @@ func TestLoadPlainEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
+
+	dotenv := NewGoDotEnv(fs)
+	loadEnvAndCompareValues(t, fs, dotenv.Overload, envFileName, expectedValues, noopPresets)
 }
 
 func TestLoadExportedEnv(t *testing.T) {
@@ -239,7 +249,9 @@ func TestLoadExportedEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
+
+	dotenv := NewGoDotEnv(fs)
+	loadEnvAndCompareValues(t, fs, dotenv.Load, envFileName, expectedValues, noopPresets)
 }
 
 func TestLoadEqualsEnv(t *testing.T) {
@@ -254,7 +266,8 @@ func TestLoadEqualsEnv(t *testing.T) {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
 
-	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
+	dotenv := NewGoDotEnv(fs)
+	loadEnvAndCompareValues(t, fs, dotenv.Load, envFileName, expectedValues, noopPresets)
 }
 
 func TestLoadQuotedEnv(t *testing.T) {
@@ -280,7 +293,9 @@ func TestLoadQuotedEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
+
+	dotenv := NewGoDotEnv(fs)
+	loadEnvAndCompareValues(t, fs, dotenv.Load, envFileName, expectedValues, noopPresets)
 }
 
 func TestSubstitutions(t *testing.T) {
@@ -304,7 +319,9 @@ func TestSubstitutions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, presets)
+
+	dotenv := NewGoDotEnv(fs)
+	loadEnvAndCompareValues(t, fs, dotenv.Load, envFileName, expectedValues, presets)
 }
 
 func TestExpanding(t *testing.T) {
@@ -406,7 +423,8 @@ func TestActualEnvVarsAreLeftAlone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	_ = Load(fs, "fixtures/plain.env")
+	dotenv := NewGoDotEnv(fs)
+	_ = dotenv.Load("fixtures/plain.env")
 
 	if os.Getenv("OPTION_A") != "actualenv" {
 		t.Error("An ENV var set earlier was overwritten")
@@ -436,7 +454,7 @@ func TestParsing(t *testing.T) {
 	// parses yaml style options
 	parseAndCompare(t, "OPTION_A: 1", "OPTION_A", "1")
 
-	//parses yaml values with equal signs
+	// parses yaml values with equal signs
 	parseAndCompare(t, "OPTION_A: Foo=bar", "OPTION_A", "Foo=bar")
 
 	// parses non-yaml options with colons
@@ -488,7 +506,7 @@ func TestParsing(t *testing.T) {
 	parseAndCompare(t, `FOO="ba#r"`, "FOO", "ba#r")
 	parseAndCompare(t, "FOO='ba#r'", "FOO", "ba#r")
 
-	//newlines and backslashes should be escaped
+	// newlines and backslashes should be escaped
 	parseAndCompare(t, `FOO="bar\n\ b\az"`, "FOO", "bar\n baz")
 	parseAndCompare(t, `FOO="bar\\\n\ b\az"`, "FOO", "bar\\\n baz")
 	parseAndCompare(t, `FOO="bar\\r\ b\az"`, "FOO", "bar\\r baz")
@@ -552,7 +570,8 @@ func TestErrorReadDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	envMap, err := Read(fs, envFileName)
+	dotenv := NewGoDotEnv(fs)
+	envMap, err := dotenv.Read(envFileName)
 
 	if err == nil {
 		t.Errorf("Expected error, got %v", envMap)
@@ -566,7 +585,8 @@ func TestErrorParsing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	envMap, err := Read(fs, envFileName)
+	dotenv := NewGoDotEnv(fs)
+	envMap, err := dotenv.Read(envFileName)
 	if err == nil {
 		t.Errorf("Expected error, got %v", envMap)
 	}
@@ -588,7 +608,9 @@ func TestComments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error copying fixture files to afero fs: %v", err)
 	}
-	loadEnvAndCompareValues(t, fs, Load, envFileName, expectedValues, noopPresets)
+
+	dotenv := NewGoDotEnv(fs)
+	loadEnvAndCompareValues(t, fs, dotenv.Load, envFileName, expectedValues, noopPresets)
 }
 
 func TestWrite(t *testing.T) {
@@ -599,14 +621,14 @@ func TestWrite(t *testing.T) {
 			t.Errorf("Expected '%v' (%v) to write as '%v', got '%v' instead.", env, envMap, expected, actual)
 		}
 	}
-	//just test some single lines to show the general idea
-	//TestRoundtrip makes most of the good assertions
+	// just test some single lines to show the general idea
+	// TestRoundtrip makes most of the good assertions
 
-	//values are always double-quoted
+	// values are always double-quoted
 	writeAndCompare(`key=value`, `key="value"`)
-	//double-quotes are escaped
+	// double-quotes are escaped
 	writeAndCompare(`key=va"lu"e`, `key="va\"lu\"e"`)
-	//but single quotes are left alone
+	// but single quotes are left alone
 	writeAndCompare(`key=va'lu'e`, `key="va'lu'e"`)
 	// newlines, backslashes, and some other special chars are escaped
 	writeAndCompare(`foo="\n\r\\r!"`, `foo="\n\r\\r\!"`)
@@ -614,7 +636,6 @@ func TestWrite(t *testing.T) {
 	writeAndCompare("foo=bar\nbaz=buzz", "baz=\"buzz\"\nfoo=\"bar\"")
 	// integers should not be quoted
 	writeAndCompare(`key="10"`, `key=10`)
-
 }
 
 func TestRoundtrip(t *testing.T) {

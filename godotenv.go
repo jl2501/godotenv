@@ -39,6 +39,17 @@ func Parse(r io.Reader) (map[string]string, error) {
 	return UnmarshalBytes(buf.Bytes())
 }
 
+// GoDotEnv is a struct that holds the methods for loading and parsing env files.
+type GoDotEnv struct {
+	afs afero.Fs
+}
+
+func NewGoDotEnv(afs afero.Fs) *GoDotEnv {
+	return &GoDotEnv{
+		afs: afs,
+	}
+}
+
 // Load will read your env file(s) and load them into ENV for this process.
 //
 // Call this function as close as possible to the start of your program (ideally in main).
@@ -50,11 +61,11 @@ func Parse(r io.Reader) (map[string]string, error) {
 //	godotenv.Load(afs, "fileone", "filetwo")
 //
 // It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults.
-func Load(fs afero.Fs, filenames ...string) (err error) {
+func (g *GoDotEnv) Load(filenames ...string) (err error) {
 	filenames = filenamesOrDefault(filenames)
 
 	for _, filename := range filenames {
-		err = loadFile(fs, filename, false)
+		err = loadFile(g.afs, filename, false)
 		if err != nil {
 			return // return early on a spazout
 		}
@@ -73,11 +84,11 @@ func Load(fs afero.Fs, filenames ...string) (err error) {
 //	godotenv.Overload(afs, "fileone", "filetwo")
 //
 // It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefully set all vars.
-func Overload(fs afero.Fs, filenames ...string) (err error) {
+func (g *GoDotEnv) Overload(filenames ...string) (err error) {
 	filenames = filenamesOrDefault(filenames)
 
 	for _, filename := range filenames {
-		err = loadFile(fs, filename, true)
+		err = loadFile(g.afs, filename, true)
 		if err != nil {
 			return // return early on a spazout
 		}
@@ -87,12 +98,12 @@ func Overload(fs afero.Fs, filenames ...string) (err error) {
 
 // Read all env (with same file loading semantics as Load) but return values as
 // a map rather than automatically writing values into env
-func Read(fs afero.Fs, filenames ...string) (envMap map[string]string, err error) {
+func (g *GoDotEnv) Read(filenames ...string) (envMap map[string]string, err error) {
 	filenames = filenamesOrDefault(filenames)
 	envMap = make(map[string]string)
 
 	for _, filename := range filenames {
-		individualEnvMap, individualErr := readFile(fs, filename)
+		individualEnvMap, individualErr := readFile(g.afs, filename)
 
 		if individualErr != nil {
 			err = individualErr
@@ -127,12 +138,12 @@ func UnmarshalBytes(src []byte) (map[string]string, error) {
 //
 // If you want more fine grained control over your command it's recommended
 // that you use [Load], [Overload] or [Read] and the `os/exec` package yourself.
-func Exec(fs afero.Fs, filenames []string, cmd string, cmdArgs []string, overload bool) error {
-	op := Load
+func (g *GoDotEnv) Exec(filenames []string, cmd string, cmdArgs []string, overload bool) error {
+	op := g.Load
 	if overload {
-		op = Overload
+		op = g.Overload
 	}
-	if err := op(fs, filenames...); err != nil {
+	if err := op(filenames...); err != nil {
 		return err
 	}
 
@@ -144,12 +155,12 @@ func Exec(fs afero.Fs, filenames []string, cmd string, cmdArgs []string, overloa
 }
 
 // Write serializes the given environment and writes it to a file.
-func Write(fs afero.Fs, envMap map[string]string, filename string) error {
+func (g *GoDotEnv) Write(envMap map[string]string, filename string) error {
 	content, err := Marshal(envMap)
 	if err != nil {
 		return err
 	}
-	file, err := fs.Create(filename)
+	file, err := g.afs.Create(filename)
 	if err != nil {
 		return err
 	}
