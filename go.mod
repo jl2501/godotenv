@@ -1,4 +1,4 @@
-module github.com/jl2501/godotenv/v3
+module github.com/jl2501/godotenv
 
 go 1.23.0
 
@@ -9,7 +9,6 @@ require github.com/spf13/afero v1.14.0
 require golang.org/x/text v0.23.0 // indirect
 
 retract (
-	v3.0.2 // only contains retractions
-	v3.0.1 // works, but should be under v1 as it is backwards compatible
-	v3.0.0 // broken due to invalid module path in go.mod
+	v1.0.1 // has breaking API changes re-released as v2.0.1
+	v1.0.0 // broken/ missing pieces -  was more of an internal PoC than a release
 )
