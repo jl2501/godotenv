@@ -1,4 +1,4 @@
-module github.com/jl2501/godotenv
+module github.com/jl2501/godotenv/v2
 
 go 1.23.0
 
@@ -19,3 +19,5 @@ require (
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7 // indirect
 )
+
+retract v2.0.0 // broken module path
