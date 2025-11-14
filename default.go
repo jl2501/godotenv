@@ -15,12 +15,10 @@ package godotenv
 
 import (
 	"sync"
-
-	"github.com/spf13/afero"
 )
 
 var getOsEnv = sync.OnceValue(func() *GoDotEnv {
-	defaultEnv := NewGoDotEnv(afero.NewOsFs())
+	defaultEnv := NewGoDotEnv(NewOsFs())
 	defaultEnv.Load()
 
 	return defaultEnv

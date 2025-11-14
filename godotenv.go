@@ -22,8 +22,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/spf13/afero"
 )
 
 const doubleQuoteSpecialChars = "\\\n\r\"!$`"
@@ -41,12 +39,12 @@ func Parse(r io.Reader) (map[string]string, error) {
 
 // GoDotEnv is a struct that holds the methods for loading and parsing env files.
 type GoDotEnv struct {
-	afs afero.Fs
+	Fs Filesyser
 }
 
-func NewGoDotEnv(afs afero.Fs) *GoDotEnv {
+func NewGoDotEnv(fs Filesyser) *GoDotEnv {
 	return &GoDotEnv{
-		afs: afs,
+		Fs: fs,
 	}
 }
 
@@ -58,14 +56,14 @@ func NewGoDotEnv(afs afero.Fs) *GoDotEnv {
 //
 // You can otherwise tell it which files to load (there can be more than one) like:
 //
-//	godotenv.Load(afs, "fileone", "filetwo")
+//	godotenv.Load("fileone", "filetwo")
 //
 // It's important to note that it WILL NOT OVERRIDE an env variable that already exists - consider the .env file to set dev vars or sensible defaults.
 func (g *GoDotEnv) Load(filenames ...string) (err error) {
 	filenames = filenamesOrDefault(filenames)
 
 	for _, filename := range filenames {
-		err = loadFile(g.afs, filename, false)
+		err = loadFile(g.Fs, filename, false)
 		if err != nil {
 			return // return early on a spazout
 		}
@@ -81,14 +79,14 @@ func (g *GoDotEnv) Load(filenames ...string) (err error) {
 //
 // You can otherwise tell it which files to load (there can be more than one) like:
 //
-//	godotenv.Overload(afs, "fileone", "filetwo")
+//	godotenv.Overload("fileone", "filetwo")
 //
 // It's important to note this WILL OVERRIDE an env variable that already exists - consider the .env file to forcefully set all vars.
 func (g *GoDotEnv) Overload(filenames ...string) (err error) {
 	filenames = filenamesOrDefault(filenames)
 
 	for _, filename := range filenames {
-		err = loadFile(g.afs, filename, true)
+		err = loadFile(g.Fs, filename, true)
 		if err != nil {
 			return // return early on a spazout
 		}
@@ -103,7 +101,7 @@ func (g *GoDotEnv) Read(filenames ...string) (envMap map[string]string, err erro
 	envMap = make(map[string]string)
 
 	for _, filename := range filenames {
-		individualEnvMap, individualErr := readFile(g.afs, filename)
+		individualEnvMap, individualErr := readFile(g.Fs, filename)
 
 		if individualErr != nil {
 			err = individualErr
@@ -160,7 +158,7 @@ func (g *GoDotEnv) Write(envMap map[string]string, filename string) error {
 	if err != nil {
 		return err
 	}
-	file, err := g.afs.Create(filename)
+	file, err := g.Fs.Create(filename)
 	if err != nil {
 		return err
 	}
@@ -194,7 +192,7 @@ func filenamesOrDefault(filenames []string) []string {
 	return filenames
 }
 
-func loadFile(fs afero.Fs, filename string, overload bool) error {
+func loadFile(fs Filesyser, filename string, overload bool) error {
 	envMap, err := readFile(fs, filename)
 	if err != nil {
 		return err
@@ -216,7 +214,7 @@ func loadFile(fs afero.Fs, filename string, overload bool) error {
 	return nil
 }
 
-func readFile(fs afero.Fs, filename string) (envMap map[string]string, err error) {
+func readFile(fs Filesyser, filename string) (envMap map[string]string, err error) {
 	file, err := fs.Open(filename)
 	if err != nil {
 		return
