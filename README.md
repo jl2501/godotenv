@@ -3,8 +3,7 @@
 > [!NOTE]
 > This is a fork of [https://github.com/joho/godotenv](https://github.com/joho/godotenv)
 >
-> Exactly the same as the joho godotenv, only allows passing in an in-memory filesystem via afero lib
-for easier unit tests.
+> Exactly the same as the joho godotenv, only allows passing in an in-memory filesystem that implements the minimum number of methods needed for easier unit tests.
 
 A Go (golang) port of the Ruby [dotenv](https://github.com/bkeepers/dotenv) project (which loads env vars from a .env file).
 
@@ -51,11 +50,10 @@ import (
     "os"
 
     "github.com/jl2501/godotenv"
-    "github.com/spf13/afero"
 )
 
 func main() {
-  err := godotenv.Load(afero.NewMemMapFs())
+  err := godotenv.Load(NewMemMapFs())
   if err != nil {
     log.Fatal("Error loading .env file")
   }
@@ -178,4 +176,4 @@ Releases should follow [Semver](http://semver.org/) though the first couple of r
 
 ## Who?
 
-The original library [dotenv](https://github.com/bkeepers/dotenv) was written by [Brandon Keepers](http://opensoul.org/), and this port was done by [John Barton](https://johnbarton.co/) based off the tests/fixtures in the original library, then supports of in-memory filesystem via afero lib was brought by [James Light](https://github.com/jl2501)
+The original library [dotenv](https://github.com/bkeepers/dotenv) was written by [Brandon Keepers](http://opensoul.org/), and this port was done by [John Barton](https://johnbarton.co/) based off the tests/fixtures in the original library, then supports of in-memory filesystem via a minimal fs interface was brought by [James Light](https://github.com/jl2501)
