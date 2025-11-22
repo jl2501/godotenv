@@ -8,8 +8,8 @@ import (
 
 // minimum set of methods needed for a File type
 type Filer interface {
-	io.Reader
 	io.Closer
+	io.Reader
 	WriteString(string) (int, error)
 	Sync() error
 	Stat() (os.FileInfo, error)
